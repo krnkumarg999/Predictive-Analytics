@@ -1,0 +1,119 @@
+---
+title: "Homework 4"
+output: html_document
+date: "2023-11-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Question 1
+```{r loadpackages, include = FALSE}
+#if(!require("pacman")) install.packages("pacman")
+pacman::p_load(readr,e1071, ggplot2, caret, rmarkdown, corrplot, lattice)
+search()
+theme_set(theme_classic())
+options(digits = 3)
+```
+
+```{r heartdisease}
+heart.df <- read_csv("C:\\Users\\tarun\\Downloads\\heart_disease.csv")
+dim(heart.df)
+str(heart.df)
+```
+ 
+```{r}
+#changing variables in to factors
+heart.df$sex <- as.factor(heart.df$sex)
+heart.df$cp <- as.factor(heart.df$cp)
+heart.df$fbs <- as.factor(heart.df$fbs)
+heart.df$rest_ecg <- as.factor(heart.df$rest_ecg)
+heart.df$exang <- as.factor(heart.df$exang)
+heart.df$thal <- as.factor(heart.df$thal)
+heart.df$heartdisease <- as.factor(heart.df$heartdisease)
+```
+#Question 2
+```{r}
+set.seed(42)
+train_index <- createDataPartition(heart.df$heartdisease, p=0.80, list= FALSE)
+heart.df_train <- heart.df[train_index, ]
+heart.df_test <- heart.df[-train_index, ]
+```
+#Question 3 to 5
+```{r}
+#Use SVM algorithm to model
+svm_model <- svm(heartdisease~., data = heart.df_train)
+svm_model
+#10-fold cross-validation and repeat this prosess 3 times
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+#Copies of the datasets
+heart_train.df <- heart.df_train
+heart_test.df <- heart.df_test
+heart_nor.df <- heart.df
+#Standarding the data
+set.seed(42)
+nor_value <- preProcess(heart.df_train[, c(1,4,5,8,10,11,12)], 
+                        method=c("center", "scale"))  
+#Using predict to preprocess the data
+heart_train.df[, c(1,4,5,8,10,11,12)] <- predict(nor_value,                       heart.df_train[,c(1,4,5,8,10,11,12)])
+heart_test.df[, c(1,4,5,8,10,11,12)] <- predict(nor_value,
+heart.df_test[, c(1,4,5,8,10,11,12)])
+heart_nor.df[, c(1,4,5,8,10,11,12)] <- predict(nor_value, 
+heart.df[, c(1,4,5,8,10,11,12)])
+```
+#Question 6
+```{r}
+#Using predict to genrate confustion matrix on test data frame
+prediction <- predict(svm_model, newdata = heart_test.df)
+#Gennerate the confusion matrix for test dataset
+confusion_matrix <- table(Predicted = prediction, Actual = heart_test.df$heartdisease)
+confusionMatrix(confusion_matrix)
+#Sensitivity from this model
+sensitivity <- confusion_matrix["1", "1"] / sum(confusion_matrix["1", ])
+cat("Sensitivity:", sensitivity, "\n")
+```
+Ans: What is the sensitivity from this model? 1.000 
+
+#Question 7
+```{r}
+#using the grid search hyperparameter optimization method for C.
+set.seed(42)
+svm_grid_search <- expand.grid(C = seq(0, 2.5, by = 0.1))
+#Run the SVM model with grid search
+svm_model_grid_search <- train(heartdisease ~ ., data = heart_train.df, 
+method = "svmLinear", trControl = ctrl, tuneGrid = svm_grid_search)
+svm_model_grid_search
+```
+#Question 8
+```{r}
+# Generate a plot to examine the relationship between accuracy and the cost
+#hyperparameter in the second SVM model
+xyplot(Accuracy ~ C, data = svm_model_grid_search$results, type = "l", main = "Accuracy vs. Cost Hyperparameter", xlab = "Cost Hyperparameter (C)", ylab = "Accuracy")
+```
+
+#Question 9
+```{r}
+# Make predictions on the test set using the tuned model
+predic_grid <- predict(svm_model_grid_search, newdata = heart_test.df)
+# Generate the confusion matrix
+confusion_matrix_grid <- confusionMatrix(predic_grid, heart.df_test$heartdisease)
+confusion_matrix_grid
+#What is the sensitivity from this model
+sensitivity_grid <- confusion_matrix_grid$sensitivity
+```
+Note: What is the sensitivity from this model? Sensitivity: 0.844
+
+#Question 10
+```{r}
+#Confusion matrix for the first SVM model
+confusion_matrix_first <- confusionMatrix(prediction, heart_test.df$heartdisease)
+#Confusion matrix for the grid SVM model
+confusion_matrix_grid <- confusionMatrix(predic_grid, heart_test.df$heartdisease)
+confusion_matrix_first
+confusion_matrix_grid
+#sensitivity for both models
+sensitivity_first <- confusion_matrix_first$sensitivity
+sensitivity_grid <- confusion_matrix_grid$sensitivity
+```
+Note: The change in the level of accuracy will help us know that the model is improved
